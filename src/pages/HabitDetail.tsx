@@ -107,16 +107,27 @@ export function HabitDetail() {
   const todayStatus = todayLog ? todayLog.status : 'empty';
 
   async function handleCommitToday() {
-      // If already committed, do nothing via button? Or toggle?
-      // "Commit Today" implies action. If done, button says "DONE".
-      // Let's make it toggle if they really want, but primarilly it commits.
-      // Actually toggleDate handles the logic: Empty -> Committed.
-      // If Committed -> Skipped.
-      // If Skipped -> Empty.
-      // So if status is 'committed', clicking button will make it skipped? That might be annoying if accidental.
-      // But consistent with grid.
-      // Let's just call toggleDate(new Date()).
       await toggleDate(new Date());
+  }
+
+  async function handleDelete() {
+    if (!habit) return;
+    if (!window.confirm('Are you sure you want to delete this habit? All progress will be lost.')) return;
+
+    try {
+      // Habit logs should be deleted automatically if cascade is on, 
+      // but let's be safe or just try deleting the habit.
+      const { error } = await supabase
+        .from('habits')
+        .delete()
+        .eq('id', habit.id);
+
+      if (error) throw error;
+      navigate('/');
+    } catch (err) {
+      console.error('Error deleting habit:', err);
+      alert('Failed to delete habit');
+    }
   }
 
   if (loading) return <div>Loading...</div>;
@@ -154,7 +165,6 @@ export function HabitDetail() {
 
        <div style={{ marginTop: '4rem', textAlign: 'center', opacity: 0.5, fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>Tap a day to toggle: Committed → Skipped → Empty</div>
-          
           <button 
              onClick={() => {
                const url = `${window.location.origin}/s/${habit.id}`;
@@ -164,6 +174,22 @@ export function HabitDetail() {
              style={{ marginTop: '1rem', alignSelf: 'center' }}
           >
              Share Public Link
+          </button>
+
+          <button 
+             onClick={handleDelete}
+             style={{ 
+                marginTop: '1rem', 
+                alignSelf: 'center', 
+                color: '#ff4444', 
+                border: '1px solid #ff4444',
+                background: 'none',
+                padding: '0.2rem 1rem',
+                fontSize: '0.8rem',
+                opacity: 0.8
+             }}
+          >
+             Delete Habit
           </button>
        </div>
     </div>

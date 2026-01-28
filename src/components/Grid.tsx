@@ -7,9 +7,10 @@ interface GridProps {
   currentDate?: Date; // Default to now
   onToggleDay?: (date: Date) => void;
   interactive?: boolean;
+  density?: 'big' | 'compact';
 }
 
-export function Grid({ logs, currentDate = new Date(), onToggleDay, interactive = false }: GridProps) {
+export function Grid({ logs, currentDate = new Date(), onToggleDay, interactive = false, density = 'big' }: GridProps) {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -26,9 +27,20 @@ export function Grid({ logs, currentDate = new Date(), onToggleDay, interactive 
 
   return (
     <div className="habit-grid-container" style={{ width: '100%' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', width: '100%', maxWidth: '100%' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(7, 1fr)', 
+        gap: density === 'compact' ? '4px' : '8px', 
+        width: '100%', 
+        maxWidth: '100%' 
+      }}>
         {weekDays.map((d, i) => (
-          <div key={i} style={{ textAlign: 'center', fontSize: '0.8rem', opacity: 0.3, paddingBottom: '10px' }}>
+          <div key={i} style={{ 
+            textAlign: 'center', 
+            fontSize: density === 'compact' ? '0.6rem' : '0.8rem', 
+            opacity: 0.3, 
+            paddingBottom: density === 'compact' ? '4px' : '10px' 
+          }}>
             {d}
           </div>
         ))}
@@ -64,7 +76,7 @@ export function Grid({ logs, currentDate = new Date(), onToggleDay, interactive 
                 width: '100%',
                 aspectRatio: '1',
                 opacity: isDayFuture ? 0.2 : 1,
-                border: isToday(day) ? '2px solid var(--color-text)' : '1px solid transparent',
+                border: isToday(day) ? `${density === 'compact' ? '1px' : '2px'} solid var(--color-text)` : '1px solid transparent',
                 cursor: interactive && !isDayFuture ? 'pointer' : 'default',
                 display: 'flex',
                 alignItems: 'center',

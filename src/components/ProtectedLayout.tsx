@@ -183,7 +183,7 @@ export function ProtectedLayout() {
         </div>
       </header>
 
-      <Outlet context={{ session }} />
+      <Outlet context={{ session, profile, onProfileUpdate: () => fetchProfile(session.user.id) }} />
 
       <ProfileSheet 
         isOpen={isProfileSheetOpen} 

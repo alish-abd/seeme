@@ -6,7 +6,8 @@ import { useOutletContext, Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 
 export function Dashboard() {
-  const { session } = useOutletContext<any>();
+  const { session, profile, onProfileUpdate } = useOutletContext<any>();
+  const density = profile?.display_density || 'big';
   const [habits, setHabits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState('');
@@ -166,11 +167,56 @@ export function Dashboard() {
     }
   }
 
+  async function toggleDensity() {
+    const newDensity = density === 'big' ? 'compact' : 'big';
+    try {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ display_density: newDensity })
+            .eq('id', session.user.id);
+
+        if (error) throw error;
+        onProfileUpdate(); // Refresh profile in parent
+    } catch (err) {
+        console.error('Error toggling density:', err);
+    }
+  }
+
   if (loading) return <div>Loading...</div>;
 
   return (
     <div className="dashboard">
-      <h1 className="title">Your Promises</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1 className="title" style={{ margin: 0 }}>Your Promises</h1>
+        <button 
+            onClick={toggleDensity}
+            className="density-toggle"
+            style={{ 
+                background: 'none', 
+                border: '1px solid #000', 
+                padding: '0.4rem 0.8rem', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 'bold',
+                transition: 'all 0.2s ease'
+            }}
+        >
+            {density === 'big' ? (
+                <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+                    Big
+                </>
+            ) : (
+                <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Compact
+                </>
+            )}
+        </button>
+      </div>
       
       <form onSubmit={createHabit} style={{ marginBottom: '4rem' }}>
         <input 
@@ -182,7 +228,37 @@ export function Dashboard() {
         />
       </form>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6rem' }}>
+      <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: density === 'compact' ? 'repeat(auto-fill, minmax(120px, 1fr))' : '1fr',
+          gap: density === 'compact' ? '1rem' : '6rem',
+      }} className={density === 'compact' ? 'dashboard-grid-compact' : ''}>
+        <style>
+            {`
+                @media (min-width: 900px) {
+                    .dashboard-grid-compact {
+                        grid-template-columns: repeat(3, 1fr) !important;
+                    }
+                }
+                @media (max-width: 899px) and (min-width: 600px) {
+                    .dashboard-grid-compact {
+                        grid-template-columns: repeat(2, 1fr) !important;
+                    }
+                }
+                @media (max-width: 599px) {
+                    .dashboard-grid-compact {
+                        grid-template-columns: repeat(2, 1fr) !important;
+                    }
+                }
+                .density-toggle:hover {
+                    background-color: #000 !important;
+                    color: #fff !important;
+                }
+                .density-toggle:hover svg {
+                    stroke: #fff !important;
+                }
+            `}
+        </style>
         {habits.map(habit => {
           const streak = calculateStreak(habit.habit_logs || []);
           const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -190,9 +266,26 @@ export function Dashboard() {
           const todayStatus = todayLog ? todayLog.status : 'empty';
 
           return (
-            <div key={habit.id} className="habit-item">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.5rem' }}>
-                <Link to={`/habit/${habit.id}`} style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>
+            <div key={habit.id} className="habit-item" style={{ 
+                height: '100%', 
+                display: 'flex', 
+                flexDirection: 'column',
+                border: density === 'compact' ? '1px solid #eee' : 'none',
+                padding: density === 'compact' ? '1rem' : '0',
+                minWidth: 0,
+                overflow: 'hidden',
+                boxSizing: 'border-box'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: density === 'compact' ? '0.75rem' : '1.5rem' }}>
+                <Link to={`/habit/${habit.id}`} style={{ 
+                    fontSize: density === 'compact' ? '0.9rem' : '1.8rem', 
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: density === 'compact' ? '60%' : '70%',
+                    display: 'block'
+                }}>
                   {habit.title}
                 </Link>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -214,24 +307,34 @@ export function Dashboard() {
                             </svg>
                         )}
                     </button>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <img src="/fire.png" alt="Streak" width="20" height="20" style={{ objectFit: 'contain' }} />
+                    <div style={{ 
+                        fontSize: density === 'compact' ? '0.9rem' : '1.2rem', 
+                        fontWeight: 'bold', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '4px' 
+                    }}>
+                        <img src="/fire.png" alt="Streak" width={density === 'compact' ? "14" : "20"} height={density === 'compact' ? "14" : "20"} style={{ objectFit: 'contain' }} />
                         {streak}
                     </div>
                 </div>
               </div>
               
-              <div style={{ marginBottom: '2rem' }}>
+              <div style={{ marginBottom: density === 'compact' ? '1rem' : '2rem' }}>
                 <Grid 
                     logs={habit.habit_logs || []} 
                     interactive={false} 
+                    density={density}
                 />
               </div>
 
-              <CommitButton 
-                status={todayStatus} 
-                onCommit={() => handleCommit(habit.id)} 
-              />
+              <div style={{ marginTop: 'auto' }}>
+                <CommitButton 
+                    status={todayStatus} 
+                    onCommit={() => handleCommit(habit.id)} 
+                    density={density}
+                />
+              </div>
             </div>
           );
         })}

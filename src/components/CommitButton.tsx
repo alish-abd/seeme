@@ -4,9 +4,10 @@ interface CommitButtonProps {
   onCommit: () => void;
   status: 'committed' | 'skipped' | 'empty';
   isLoading?: boolean;
+  density?: 'big' | 'compact';
 }
 
-export function CommitButton({ onCommit, status, isLoading = false }: CommitButtonProps) {
+export function CommitButton({ onCommit, status, isLoading = false, density = 'big' }: CommitButtonProps) {
   const isCommitted = status === 'committed';
   
   return (
@@ -15,9 +16,9 @@ export function CommitButton({ onCommit, status, isLoading = false }: CommitButt
       disabled={isLoading}
       style={{
         width: '100%',
-        maxWidth: '400px',
-        height: '80px',
-        fontSize: '1.5rem',
+        maxWidth: density === 'compact' ? 'none' : '400px',
+        height: density === 'compact' ? '40px' : '80px',
+        fontSize: density === 'compact' ? '0.8rem' : '1.5rem',
         fontWeight: 'bold',
         textTransform: 'uppercase',
         letterSpacing: '0.1em',
@@ -29,10 +30,10 @@ export function CommitButton({ onCommit, status, isLoading = false }: CommitButt
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        margin: '2rem auto'
+        margin: density === 'compact' ? '1rem auto' : '2rem auto'
       }}
     >
-      {isLoading ? '...' : (isCommitted ? 'DONE FOR TODAY' : 'COMMIT TODAY')}
+      {isLoading ? '...' : (isCommitted ? 'DONE' : 'COMMIT')}
     </button>
   );
 }
