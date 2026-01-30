@@ -4,12 +4,14 @@ import { supabase } from '../lib/supabase';
 import { Grid } from '../components/Grid';
 import { format } from 'date-fns';
 import { CommitButton } from '../components/CommitButton';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export function HabitDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [habit, setHabit] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     fetchHabit();
@@ -112,11 +114,8 @@ export function HabitDetail() {
 
   async function handleDelete() {
     if (!habit) return;
-    if (!window.confirm('Are you sure you want to delete this habit? All progress will be lost.')) return;
-
+    
     try {
-      // Habit logs should be deleted automatically if cascade is on, 
-      // but let's be safe or just try deleting the habit.
       const { error } = await supabase
         .from('habits')
         .delete()
@@ -177,7 +176,7 @@ export function HabitDetail() {
           </button>
 
           <button 
-             onClick={handleDelete}
+             onClick={() => setShowDeleteConfirm(true)}
              style={{ 
                 marginTop: '1rem', 
                 alignSelf: 'center', 
@@ -192,6 +191,16 @@ export function HabitDetail() {
              Delete Habit
           </button>
        </div>
+
+
+       <ConfirmDialog
+         isOpen={showDeleteConfirm}
+         title="Delete Habit?"
+         message="Are you sure you want to delete this habit? All progress will be lost permanently."
+         confirmText="Delete"
+         onConfirm={handleDelete}
+         onCancel={() => setShowDeleteConfirm(false)}
+       />
     </div>
   );
 }
