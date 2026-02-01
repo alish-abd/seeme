@@ -7,11 +7,19 @@ import { format, parseISO } from 'date-fns';
 
 export function Dashboard() {
   const { session, profile, onProfileUpdate } = useOutletContext<any>();
-  const density = profile?.display_density || 'big';
+  const density = 'compact';
   const [habits, setHabits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [creating, setCreating] = useState(false);
+  const [viewMode, setViewMode] = useState<'calendar' | 'day'>(profile?.display_view || 'calendar');
+
+  // Sync state with profile if it changes (e.g. reload or update)
+  useEffect(() => {
+    if (profile?.display_view) {
+      setViewMode(profile.display_view);
+    }
+  }, [profile?.display_view]);
 
   useEffect(() => {
     fetchHabits();
@@ -105,13 +113,8 @@ export function Dashboard() {
     let operation = 'insert';
 
     if (existingLog) {
-      if (existingLog.status === 'committed') {
-        newStatus = 'skipped';
-        operation = 'update';
-      } else if (existingLog.status === 'skipped') {
-        newStatus = 'empty';
-        operation = 'delete';
-      }
+      newStatus = 'empty'; // Always toggle to empty if it exists
+      operation = 'delete';
     }
 
     // Optimistic UI Update
@@ -146,20 +149,22 @@ export function Dashboard() {
     }
   }
 
+  async function toggleViewMode() {
+    const newView = viewMode === 'calendar' ? 'day' : 'calendar';
+    
+    // Optimistic update
+    setViewMode(newView);
 
-
-  async function toggleDensity() {
-    const newDensity = density === 'big' ? 'compact' : 'big';
     try {
-        const { error } = await supabase
-            .from('profiles')
-            .update({ display_density: newDensity })
-            .eq('id', session.user.id);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ display_view: newView })
+        .eq('id', session.user.id);
 
-        if (error) throw error;
-        onProfileUpdate(); // Refresh profile in parent
+      if (error) throw error;
+      onProfileUpdate(); // Refresh global profile state
     } catch (err) {
-        console.error('Error toggling density:', err);
+      console.error('Error saving view mode:', err);
     }
   }
 
@@ -169,9 +174,10 @@ export function Dashboard() {
     <div className="dashboard">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h1 className="title" style={{ margin: 0 }}>Your Promises</h1>
+
+
         <button 
-            onClick={toggleDensity}
-            className="density-toggle"
+            onClick={toggleViewMode}
             style={{ 
                 background: 'none', 
                 border: '1px solid #000', 
@@ -181,25 +187,25 @@ export function Dashboard() {
                 alignItems: 'center',
                 gap: '8px',
                 fontSize: '0.85rem',
-                fontWeight: 'bold',
-                transition: 'all 0.2s ease'
+                fontWeight: 'bold'
             }}
+            className="density-toggle"
         >
-            {density === 'big' ? (
+            {viewMode === 'calendar' ? (
                 <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
-                    Big
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Day View
                 </>
             ) : (
                 <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                    Compact
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+                    Grid View
                 </>
             )}
         </button>
       </div>
       
-      <form onSubmit={createHabit} style={{ marginBottom: '4rem' }}>
+      <form onSubmit={createHabit} style={{ marginBottom: '4rem', position: 'relative', display: 'flex', alignItems: 'center' }}>
         <input 
           placeholder="New habit..." 
           value={newHabitTitle}
@@ -207,13 +213,28 @@ export function Dashboard() {
           disabled={creating}
           style={{ padding: '1rem', fontSize: '1.2rem', borderBottom: '2px solid #000', borderTop: 'none', borderLeft: 'none', borderRight: 'none', background: 'transparent', width: '100%' }}
         />
+        {newHabitTitle.trim() && (
+          <button 
+            type="submit"
+            disabled={creating}
+            style={{ 
+              position: 'absolute', 
+              right: 0, 
+              background: '#000', 
+              color: '#fff', 
+              border: 'none', 
+              padding: '0.6rem 1.2rem', 
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              letterSpacing: '0.05em'
+            }}
+          >
+            {creating ? '...' : 'ADD'}
+          </button>
+        )}
       </form>
 
-      <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: density === 'compact' ? 'repeat(auto-fill, minmax(120px, 1fr))' : '1fr',
-          gap: density === 'compact' ? '1rem' : '6rem',
-      }} className={density === 'compact' ? 'dashboard-grid-compact' : ''}>
         <style>
             {`
                 @media (min-width: 900px) {
@@ -240,68 +261,128 @@ export function Dashboard() {
                 }
             `}
         </style>
-        {habits.map(habit => {
-          const streak = calculateStreak(habit.habit_logs || []);
-          const todayStr = format(new Date(), 'yyyy-MM-dd');
-          const todayLog = habit.habit_logs?.find((l: any) => l.date === todayStr);
-          const todayStatus = todayLog ? todayLog.status : 'empty';
 
-          return (
-            <div key={habit.id} className="habit-item" style={{ 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column',
-                border: density === 'compact' ? '1px solid #eee' : 'none',
-                padding: density === 'compact' ? '1rem' : '0',
-                minWidth: 0,
-                overflow: 'hidden',
-                boxSizing: 'border-box'
+        {viewMode === 'day' ? (
+          <div style={{ marginTop: '2rem' }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              padding: '1rem', 
+              fontSize: '1.5rem', 
+              fontWeight: '500',
+              borderBottom: '1px solid #eee',
+              marginBottom: '1rem'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: density === 'compact' ? '0.75rem' : '1.5rem' }}>
-                <Link to={`/habit/${habit.id}`} style={{ 
-                    fontSize: density === 'compact' ? '0.9rem' : '1.8rem', 
-                    fontWeight: 'bold',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    maxWidth: density === 'compact' ? '75%' : '85%',
-                    display: 'block'
-                }}>
-                  {habit.title}
-                </Link>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-
-                    <div style={{ 
-                        fontSize: density === 'compact' ? '0.9rem' : '1.2rem', 
-                        fontWeight: 'bold', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '4px' 
-                    }}>
-                        <img src="/fire.png" alt="Streak" width={density === 'compact' ? "14" : "20"} height={density === 'compact' ? "14" : "20"} style={{ objectFit: 'contain' }} />
-                        {streak}
-                    </div>
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: density === 'compact' ? '1rem' : '2rem' }}>
-                <Grid 
-                    logs={habit.habit_logs || []} 
-                    interactive={false} 
-                    density={density}
-                />
-              </div>
-
-              <div style={{ marginTop: 'auto' }}>
-                <CommitButton 
-                    status={todayStatus} 
-                    onCommit={() => handleCommit(habit.id)} 
-                    density={density}
-                />
-              </div>
+              {format(new Date(), 'EEE, d MMMM')}
             </div>
-          );
-        })}
+            {habits.map(habit => {
+              const todayStr = format(new Date(), 'yyyy-MM-dd');
+              const todayLog = habit.habit_logs?.find((l: any) => l.date === todayStr);
+              const isCommitted = todayLog?.status === 'committed';
+
+              return (
+                <div key={habit.id} style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  padding: '1.5rem 0',
+                  borderBottom: '1px solid #eee'
+                }}>
+                  <Link to={`/habit/${habit.id}`} style={{ fontSize: '1.5rem', fontWeight: '500' }}>
+                    {habit.title}
+                  </Link>
+                  <div 
+                    onClick={() => handleCommit(habit.id)}
+                    style={{ 
+                      width: '40px', 
+                      height: '40px', 
+                      backgroundColor: isCommitted ? '#000' : '#e5e5e5',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.1s ease'
+                    }}
+                  >
+                    {isCommitted && (
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: density === 'compact' ? 'repeat(auto-fill, minmax(120px, 1fr))' : '1fr',
+              gap: density === 'compact' ? '1rem' : '6rem',
+          }} className={density === 'compact' ? 'dashboard-grid-compact' : ''}>
+            {habits.map(habit => {
+              const streak = calculateStreak(habit.habit_logs || []);
+              const todayStr = format(new Date(), 'yyyy-MM-dd');
+              const todayLog = habit.habit_logs?.find((l: any) => l.date === todayStr);
+              const todayStatus = todayLog ? todayLog.status : 'empty';
+
+              return (
+                <div key={habit.id} className="habit-item" style={{ 
+                    height: '100%', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    border: density === 'compact' ? '1px solid #eee' : 'none',
+                    padding: density === 'compact' ? '1rem' : '0',
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    boxSizing: 'border-box'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: density === 'compact' ? '0.75rem' : '1.5rem' }}>
+                    <Link to={`/habit/${habit.id}`} style={{ 
+                        fontSize: density === 'compact' ? '0.9rem' : '1.8rem', 
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: density === 'compact' ? '75%' : '85%',
+                        display: 'block'
+                    }}>
+                      {habit.title}
+                    </Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ 
+                            fontSize: density === 'compact' ? '0.9rem' : '1.2rem', 
+                            fontWeight: 'bold', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '4px' 
+                        }}>
+                            <img src="/fire.png" alt="Streak" width={density === 'compact' ? "14" : "20"} height={density === 'compact' ? "14" : "20"} style={{ objectFit: 'contain' }} />
+                            {streak}
+                        </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: density === 'compact' ? '1rem' : '2rem' }}>
+                    <Grid 
+                        logs={habit.habit_logs || []} 
+                        interactive={false} 
+                        density={density}
+                    />
+                  </div>
+
+                  <div style={{ marginTop: 'auto' }}>
+                    <CommitButton 
+                        status={todayStatus} 
+                        onCommit={() => handleCommit(habit.id)} 
+                        density={density}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         
         {habits.length === 0 && (
             <div style={{ opacity: 0.5, fontStyle: 'italic' }}>
@@ -309,6 +390,5 @@ export function Dashboard() {
             </div>
         )}
       </div>
-    </div>
   );
 }
