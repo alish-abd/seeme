@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Grid } from '../components/Grid';
 import { format } from 'date-fns';
-import { CommitButton } from '../components/CommitButton';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export function HabitDetail() {
@@ -12,6 +11,9 @@ export function HabitDetail() {
   const [habit, setHabit] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   useEffect(() => {
     fetchHabit();
@@ -37,6 +39,8 @@ export function HabitDetail() {
       return;
     }
     setHabit(data);
+    setEditTitle(data.title);
+    setEditDescription(data.description || '');
     setLoading(false);
   }
 
@@ -103,13 +107,26 @@ export function HabitDetail() {
     }
   }
 
-  // Helper to get today's status
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const todayLog = habit?.habit_logs?.find((l: any) => l.date === todayStr);
-  const todayStatus = todayLog ? todayLog.status : 'empty';
+  async function handleUpdate() {
+    if (!habit || !editTitle.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({
+          title: editTitle,
+          description: editDescription
+        })
+        .eq('id', habit.id);
 
-  async function handleCommitToday() {
-      await toggleDate(new Date());
+      if (error) throw error;
+      
+      setHabit({ ...habit, title: editTitle, description: editDescription });
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Error updating habit:', err);
+      alert('Failed to update habit');
+    }
   }
 
   async function handleDelete() {
@@ -137,24 +154,57 @@ export function HabitDetail() {
          ← Back
        </button>
        
-       <h1 className="title" style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{habit.title}</h1>
-       {habit.description && <p style={{ color: '#666', marginBottom: '2rem' }}>{habit.description}</p>}
+       {isEditing ? (
+         <div style={{ marginBottom: '2rem' }}>
+           <input 
+             value={editTitle}
+             onChange={e => setEditTitle(e.target.value)}
+             style={{ fontSize: '3rem', fontWeight: 'bold', border: 'none', borderBottom: '2px solid #000', width: '100%', padding: '0.5rem 0', background: 'transparent', marginBottom: '1rem' }}
+             placeholder="Habit title..."
+           />
+           <textarea 
+             value={editDescription}
+             onChange={e => setEditDescription(e.target.value)}
+             style={{ width: '100%', border: '1px solid #eee', padding: '1rem', fontFamily: 'inherit', fontSize: '1rem', minHeight: '100px', outline: 'none' }}
+             placeholder="Description (optional)..."
+           />
+           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+             <button onClick={handleUpdate}>Save Changes</button>
+             <button onClick={() => setIsEditing(false)} style={{ border: 'none', opacity: 0.5 }}>Cancel</button>
+           </div>
+         </div>
+       ) : (
+         <div style={{ marginBottom: '4rem' }}>
+           <h1 className="title" style={{ fontSize: '4rem', marginBottom: '0.5rem', lineHeight: 1 }}>{habit.title}</h1>
+           {habit.description && <p style={{ color: '#666', marginBottom: '1.5rem', fontSize: '1.1rem' }}>{habit.description}</p>}
+           
+           <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                onClick={() => setIsEditing(true)}
+                style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', opacity: 0.6 }}
+              >
+                Edit
+              </button>
+              <button 
+                onClick={() => setShowDeleteConfirm(true)}
+                style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', opacity: 0.6, color: '#ff4444', borderColor: '#ff4444' }}
+              >
+                Delete
+              </button>
+           </div>
+         </div>
+       )}
        
-       <div style={{ marginBottom: '2rem' }}>
+       <div style={{ marginBottom: '4rem' }}>
            <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '6rem', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.05em' }}>
+              <span style={{ fontSize: '8rem', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.05em' }}>
                  {habit.habit_logs.filter((l:any) => l.status === 'committed').length} 
               </span>
               <span style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#666' }}>days total</span>
            </div>
         </div>
 
-       <CommitButton 
-          onCommit={handleCommitToday} 
-          status={todayStatus} 
-       />
-
-       <div style={{ margin: '0 auto', display: 'flex', justifyContent: 'center' }}>
+       <div style={{ margin: '0 auto', display: 'flex', justifyContent: 'center', marginBottom: '4rem' }}>
          <Grid 
             logs={habit.habit_logs} 
             interactive={true} 
@@ -162,34 +212,8 @@ export function HabitDetail() {
          />
        </div>
 
-       <div style={{ marginTop: '4rem', textAlign: 'center', opacity: 0.5, fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>Tap a day to toggle: Committed → Skipped → Empty</div>
-          <button 
-             onClick={() => {
-               const url = `${window.location.origin}/s/${habit.id}`;
-               navigator.clipboard.writeText(url);
-               alert('Public link copied to clipboard!');
-             }}
-             style={{ marginTop: '1rem', alignSelf: 'center' }}
-          >
-             Share Public Link
-          </button>
-
-          <button 
-             onClick={() => setShowDeleteConfirm(true)}
-             style={{ 
-                marginTop: '1rem', 
-                alignSelf: 'center', 
-                color: '#ff4444', 
-                border: '1px solid #ff4444',
-                background: 'none',
-                padding: '0.2rem 1rem',
-                fontSize: '0.8rem',
-                opacity: 0.8
-             }}
-          >
-             Delete Habit
-          </button>
+       <div style={{ textAlign: 'center', opacity: 0.3, fontSize: '0.8rem' }}>
+          Tap a day to toggle: Committed → Skipped → Empty
        </div>
 
 

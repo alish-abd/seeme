@@ -43,7 +43,7 @@ button:active {
   transform: translateY(1px);
 }
 
-input {
+input, textarea {
   border: 1px solid #cccccc;
   padding: 8px;
   font-family: inherit;
@@ -51,9 +51,11 @@ input {
   width: 100%;
   border-radius: 0;
   outline: none;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
-input:focus {
+input:focus, textarea:focus {
   border-color: var(--color-text);
 }
 
